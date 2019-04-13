@@ -1,9 +1,10 @@
-from bs4 import BeautifulSoup
-import json
-import requests
 import ast
-import sys
+import os
 import pprint
+import sys
+
+import requests
+from bs4 import BeautifulSoup
 
 
 def get_comment(target_url):
@@ -42,7 +43,7 @@ def get_comment(target_url):
         # 次に飛ぶurlのデータがある部分をfind_allで探してsplitで整形
         for scrp in soup.find_all('script'):
             if 'window["ytInitialData"]' in scrp.text:
-                dict_str = scrp.text.split(' = ')[1]
+                dict_str = scrp.text.split(' = ', 1)[1]
 
         # javascript表記を整形，falseとtrueの表記を直す
         dict_str = dict_str.replace('false', 'False')
@@ -51,7 +52,17 @@ def get_comment(target_url):
         # 辞書形式と認識するとかんたんにデータを取得できるが，末尾に邪魔なのがあるので消しておく（「空白2つ + \n + ;」を消す）
         dict_str = dict_str.rstrip('  \n;')
         # 辞書形式に変換
-        dics = eval(dict_str)
+        try:
+            dics = eval(dict_str)
+        except:
+            with open('error_dict_str.txt', 'w') as f:
+                f.write(dict_str)
+            with open('error_soup.txt', 'w') as f:
+                f.write(str(soup))
+            print('コメントの変換に失敗しました')
+            # print(dict_str)
+            print(sys.exc_info()[0])
+            sys.exit()
 
         # 'https://www.youtube.com/live_chat_replay?continuation=' + continue_url が次のlive_chat_replayのurl
         # 次のurlが取得できなければ終了
@@ -83,10 +94,13 @@ def get_comment(target_url):
     return comment_data
 
 
-def convert_time(t):
-    t = list(map(int, t.split(':')))
+def convert_time(input_t):
+    t = list(map(int, input_t.split(':')))
     if len(t) == 2:
-        t = 60 * t[0] + t[1]
+        if input_t[0] == '-':
+            t = 0
+        else:
+            t = 60 * t[0] + t[1]
     else:
         t = 60 * 60 * t[0] + 60 * t[1] + t[2]
     return t
@@ -117,9 +131,9 @@ def find_highlight(comment_data, interval=10, grass_num=9, margin=10):
             purchase_total += c['purchase']
             purchase_num += 1
 
-    pprint.pprint(point)
+    # pprint.pprint(point)
 
-    # 投稿するコメントをと生成
+    # 投稿するコメントを生成
     comment = '見どころ\n'
     for c in point:
         if c[1] > grass_num:
@@ -127,13 +141,13 @@ def find_highlight(comment_data, interval=10, grass_num=9, margin=10):
     total = len(comment_data)
     minute_speed = round(len(comment_data) /
                          (comment_data[-1]['timestamp'] / 60), 2)
-    comment += f'\n総コメント数 {total}\n総草コメント数 {cnt}\n1分あたりのコメント数 {minute_speed}\nスパチャ合計金額 {purchase_total}'
+    comment += f'\n総コメント数 {total}\n総草コメント数 {cnt}\n1分あたりのコメント数 {minute_speed}'
     return comment
 
 
 def inverse_convert_time(t, margin):
     if t - margin > 0:
-        m, s = divmod(t-margin, 60)
+        m, s = divmod(t - margin, 60)
         h, m = divmod(m, 60)
     else:
         m, s = divmod(t, 60)
@@ -147,10 +161,14 @@ def inverse_convert_time(t, margin):
 
 if __name__ == '__main__':
     target_url = sys.argv[1]
-    comment_data = get_comment(target_url)
-    # with open('comment_data2.txt', 'w') as f:
-    # f.write(str(comment_data))
-    # with open('comment_data2.txt', 'r') as f:
-    #comment_data = ast.literal_eval(f.read())
-    comment = find_highlight(comment_data)
+    filename = 'comment/' + target_url.split('/')[-1] + '.txt'
+    if os.path.isfile(filename):
+        with open(filename, 'r') as f:
+            comment_data = ast.literal_eval(f.read())
+    else:
+        comment_data = get_comment(target_url)
+        with open(filename, 'w') as f:
+            f.write(str(comment_data))
+
+    comment = find_highlight(comment_data, interval=1, grass_num=20)
     print(comment)
