@@ -1,8 +1,11 @@
 import ast
 import os
+import pathlib
 import pprint
 import sys
+from argparse import ArgumentParser
 
+import pyperclip
 import requests
 from bs4 import BeautifulSoup
 
@@ -106,7 +109,7 @@ def convert_time(input_t):
     return t
 
 
-def find_highlight(comment_data, interval=10, grass_num=9, margin=10):
+def find_highlight(comment_data, interval, grass_num, margin):
     '''
     interval この秒数以内であれば同一の見どころ
     grass_num 見どころとする草コメント数
@@ -159,16 +162,31 @@ def inverse_convert_time(t, margin):
         return f'{m}:{s:02}'
 
 
+def parse():
+    parser = ArgumentParser()
+
+    parser.add_argument('url', help='youtubeのurl', type=str)
+    parser.add_argument('-i', help='次の草コメントを受け付ける時間', default=10, type=int)
+    parser.add_argument('-g', help='これより大きい数の草コメントを抽出する', default=5, type=int)
+    parser.add_argument('-m', help='m秒前の地点をみどころの開始地点とする', default=10, type=int)
+
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-    target_url = sys.argv[1]
-    filename = 'comment/' + target_url.split('/')[-1] + '.txt'
+    args = parse()
+
+    if not os.path.isdir('comment'):
+        pathlib.Path('comment')
+    filename = 'comment/' + args.url.split('/')[-1] + '.txt'
     if os.path.isfile(filename):
         with open(filename, 'r') as f:
             comment_data = ast.literal_eval(f.read())
     else:
-        comment_data = get_comment(target_url)
+        comment_data = get_comment(args.url)
         with open(filename, 'w') as f:
             f.write(str(comment_data))
 
-    comment = find_highlight(comment_data, interval=1, grass_num=20)
+    comment = find_highlight(comment_data, args.i, args.g, args.m)
+    pyperclip.copy(comment)
     print(comment)
