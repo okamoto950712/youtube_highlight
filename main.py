@@ -1,7 +1,7 @@
 import ast
 import os
 import pathlib
-import pprint
+# import pprint
 import sys
 from argparse import ArgumentParser
 
@@ -16,7 +16,6 @@ def get_comment(target_url):
     要素はdict型
         message コメント str型
         timestanp 投稿された時間(秒) int型
-        purchase スパチャ金額 int型
     '''
     comment_data = []
     dict_str = ''
@@ -28,9 +27,8 @@ def get_comment(target_url):
     # 動画ページにrequestsを実行，htmlソースを入手し，live_chat_replayの先頭urlを入手
     try:
         html = requests.get(target_url)
-    except:
-        print('urlが間違っている?')
-        print(sys.exc_info()[0])
+    except Exception as e:
+        print(e)
         sys.exit()
 
     soup = BeautifulSoup(html.text, 'html.parser')
@@ -57,7 +55,7 @@ def get_comment(target_url):
         # 辞書形式に変換
         try:
             dics = eval(dict_str)
-        except:
+        except Exception:
             with open('error_dict_str.txt', 'w') as f:
                 f.write(dict_str)
             with open('error_soup.txt', 'w') as f:
@@ -72,7 +70,7 @@ def get_comment(target_url):
         try:
             continue_url = dics['continuationContents']['liveChatContinuation'][
                 'continuations'][0]['liveChatReplayContinuationData']['continuation']
-        except:
+        except Exception:
             break
         next_url = 'https://www.youtube.com/live_chat_replay?continuation=' + continue_url
 
@@ -85,13 +83,13 @@ def get_comment(target_url):
                     d['message'] = samp['liveChatPaidMessageRenderer']['message']['simpleText']
                     t = samp['liveChatPaidMessageRenderer']['timestampText']['simpleText']
                     d['timestamp'] = convert_time(t)
-                    p = samp['liveChatPaidMessageRenderer']['purchaseAmountText']['simpleText']
-                    d['purchase'] = int(p[1:])
+                    d['id'] = samp['liveChatPaidMessageRenderer']['authorExternalChannelId']
                 else:
                     d['message'] = samp['liveChatTextMessageRenderer']['message']['simpleText']
                     t = samp['liveChatTextMessageRenderer']['timestampText']['simpleText']
                     d['timestamp'] = convert_time(t)
-            except:
+                    d['id'] = samp['liveChatTextMessageRenderer']['authorExternalChannelId']
+            except Exception:
                 continue
             comment_data.append(d)
     return comment_data
@@ -114,12 +112,13 @@ def find_highlight(comment_data, interval, grass_num, margin):
     interval この秒数以内であれば同一の見どころ
     grass_num 見どころとする草コメント数
     margin はじめて草コメントがあった箇所からマージンを取る
+
+    authorExternalChannelId
     '''
     time = -11
     cnt = 0
-    purchase_total = 0
-    purchase_num = 0
     point = []
+    client = set()
     for c in comment_data:
         m = c['message']
         if m[-1] == '草' or m[-1] == 'w':
@@ -130,21 +129,19 @@ def find_highlight(comment_data, interval, grass_num, margin):
             else:
                 time = c['timestamp']
                 point[-1][1] += 1
-        if 'purchase' in c:
-            purchase_total += c['purchase']
-            purchase_num += 1
+        client.add(c['id'])
 
     # pprint.pprint(point)
 
     # 投稿するコメントを生成
-    comment = '見どころ\n'
+    comment = ''
     for c in point:
         if c[1] > grass_num:
             comment += (inverse_convert_time(c[0], margin) + f' 草×{c[1]}\n')
     total = len(comment_data)
-    minute_speed = round(len(comment_data) /
-                         (comment_data[-1]['timestamp'] / 60), 2)
-    comment += f'\n総コメント数 {total}\n総草コメント数 {cnt}\n1分あたりのコメント数 {minute_speed}'
+    minute_speed = len(comment_data) / (comment_data[-1]['timestamp'] / 60)
+    minute_speed = round(minute_speed, 2)
+    comment += f'\nコメント数 {total}\n草コメント数 {cnt}\n1分あたりのコメント数 {minute_speed}\nコメントした人数 {len(client)}'
     return comment
 
 
