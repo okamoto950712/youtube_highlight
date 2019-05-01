@@ -1,7 +1,6 @@
-import ast
+import csv
 import os
 import pathlib
-# import pprint
 import sys
 from argparse import ArgumentParser
 
@@ -154,16 +153,16 @@ def inverse_convert_time(t, margin):
         h, m = divmod(m, 60)
 
     if h > 0:
-        return f'{h}:{m:02}:{s:02}'
+        return f'{h:.0f}:{m:02.0f}:{s:02.0f}'
     else:
-        return f'{m}:{s:02}'
+        return f'{m:.0f}:{s:02.0f}'
 
 
 def parse():
     parser = ArgumentParser()
 
     parser.add_argument('url', help='youtubeのurl', type=str)
-    parser.add_argument('-i', help='次の草コメントを受け付ける時間', default=10, type=int)
+    parser.add_argument('-i', help='次の草コメントを受け付ける時間', default=5, type=int)
     parser.add_argument('-g', help='これより大きい数の草コメントを抽出する', default=5, type=int)
     parser.add_argument('-m', help='m秒前の地点をみどころの開始地点とする', default=10, type=int)
 
@@ -178,11 +177,17 @@ if __name__ == '__main__':
     filename = 'comment/' + args.url.split('/')[-1] + '.txt'
     if os.path.isfile(filename):
         with open(filename, 'r') as f:
-            comment_data = ast.literal_eval(f.read())
+            # comment_data = ast.literal_eval(f.read())
+            reader = csv.DictReader(f, quoting=csv.QUOTE_NONNUMERIC)
+            comment_data = list(reader)
     else:
         comment_data = get_comment(args.url)
         with open(filename, 'w') as f:
-            f.write(str(comment_data))
+            # f.write(str(comment_data))
+            writer = csv.DictWriter(
+                f, ['timestamp', 'message', 'id'], quoting=csv.QUOTE_NONNUMERIC)
+            writer.writeheader()
+            writer.writerows(comment_data)
 
     comment = find_highlight(comment_data, args.i, args.g, args.m)
     pyperclip.copy(comment)
