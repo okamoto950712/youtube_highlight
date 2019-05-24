@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import csv
 import os
 import pathlib
@@ -95,12 +97,11 @@ def get_comment(target_url):
 
 
 def convert_time(input_t):
+    if input_t[0] == '-':
+        return 0
     t = list(map(int, input_t.split(':')))
     if len(t) == 2:
-        if input_t[0] == '-':
-            t = 0
-        else:
-            t = 60 * t[0] + t[1]
+        t = 60 * t[0] + t[1]
     else:
         t = 60 * 60 * t[0] + 60 * t[1] + t[2]
     return t
@@ -163,7 +164,7 @@ def parse():
 
     parser.add_argument('url', help='youtubeのurl', type=str)
     parser.add_argument('-i', help='次の草コメントを受け付ける時間', default=5, type=int)
-    parser.add_argument('-g', help='これより大きい数の草コメントを抽出する', default=5, type=int)
+    parser.add_argument('-g', help='これ以上の草コメントを抽出する', default=5, type=int)
     parser.add_argument('-m', help='m秒前の地点をみどころの開始地点とする', default=10, type=int)
 
     return parser.parse_args()
@@ -174,7 +175,7 @@ if __name__ == '__main__':
 
     if not os.path.isdir('comment'):
         pathlib.Path('comment')
-    filename = 'comment/' + args.url.split('/')[-1] + '.txt'
+    filename = 'comment/' + args.url.split('=')[1] + '.txt'
     if os.path.isfile(filename):
         with open(filename, 'r') as f:
             # comment_data = ast.literal_eval(f.read())
@@ -189,6 +190,6 @@ if __name__ == '__main__':
             writer.writeheader()
             writer.writerows(comment_data)
 
-    comment = find_highlight(comment_data, args.i, args.g, args.m)
+    comment = find_highlight(comment_data, args.i, args.g - 1, args.m)
     pyperclip.copy(comment)
     print(comment)
