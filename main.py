@@ -80,17 +80,48 @@ def get_comment(target_url):
             d = {}
             try:
                 samp = samp['replayChatItemAction']['actions'][0]['addChatItemAction']['item']
-                if 'liveChatPaidMessageRenderer' in samp:
-                    d['message'] = samp['liveChatPaidMessageRenderer']['message']['simpleText']
-                    t = samp['liveChatPaidMessageRenderer']['timestampText']['simpleText']
-                    d['timestamp'] = convert_time(t)
-                    d['id'] = samp['liveChatPaidMessageRenderer']['authorExternalChannelId']
-                else:
-                    d['message'] = samp['liveChatTextMessageRenderer']['message']['simpleText']
+                chat_type = list(samp.keys())[0]
+                if 'liveChatTextMessageRenderer' == chat_type:
+                    # 通常チャットの処理
+                    if 'simpleText' in samp['liveChatTextMessageRenderer']['message']:
+                        d['message'] = samp['liveChatTextMessageRenderer']['message']['simpleText']
+                    else:
+                        d['message'] = ''
+                        for elem in samp['liveChatTextMessageRenderer']['message']['runs']:
+                            if 'text' in elem:
+                                d['message'] += elem['text']
+                            else:
+                                d['message'] += elem['emoji']['shortcuts'][0]
                     t = samp['liveChatTextMessageRenderer']['timestampText']['simpleText']
                     d['timestamp'] = convert_time(t)
                     d['id'] = samp['liveChatTextMessageRenderer']['authorExternalChannelId']
+                elif 'liveChatPaidMessageRenderer' == chat_type:
+                    # スパチャの処理
+                    if 'simpleText' in samp['liveChatPaidMessageRenderer']['message']:
+                        d['message'] = samp['liveChatPaidMessageRenderer']['message']['simpleText']
+                    else:
+                        d['message'] = ''
+                        for elem in samp['liveChatPaidMessageRenderer']['message']['runs']:
+                            if 'text' in elem:
+                                d['message'] += elem['text']
+                            else:
+                                d['message'] += elem['emoji']['shortcuts'][0]
+                    t = samp['liveChatPaidMessageRenderer']['timestampText']['simpleText']
+                    d['timestamp'] = convert_time(t)
+                    d['id'] = samp['liveChatPaidMessageRenderer']['authorExternalChannelId']
+                elif 'liveChatPaidStickerRenderer' == chat_type:
+                    # コメントなしスパチャ
+                    continue
+                elif 'liveChatLegacyPaidMessageRenderer' == chat_type:
+                    # 新規メンバーメッセージ
+                    continue
+                elif 'liveChatPlaceholderItemRenderer' == chat_type:
+                    continue
+                else:
+                    print('知らないチャットの種類' + chat_type)
+                    continue
             except Exception:
+                # print(Exception.args)
                 continue
             comment_data.append(d)
     return comment_data
@@ -165,7 +196,7 @@ def parse():
     parser.add_argument('url', help='youtubeのurl', type=str)
     parser.add_argument('-i', help='次の草コメントを受け付ける時間', default=5, type=int)
     parser.add_argument('-g', help='これ以上の草コメントを抽出する', default=5, type=int)
-    parser.add_argument('-m', help='m秒前の地点をみどころの開始地点とする', default=10, type=int)
+    parser.add_argument('-m', help='m秒前の地点をみどころの開始地点とする', default=15, type=int)
 
     return parser.parse_args()
 
